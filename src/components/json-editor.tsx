@@ -19,17 +19,17 @@ export function JsonEditor({
 
   return (
     <div
-      className={`rounded-xl border-2 ${borderColor} transition-colors overflow-auto max-h-[60vh] scrollbar-thin`}
+      className={`rounded-xl border-2 ${borderColor} transition-colors overflow-auto flex-1 scrollbar-thin group`}
       style={{ background: "var(--code-bg)" }}
     >
-      <div className="flex font-mono text-sm min-w-max">
+      <div className="flex font-mono text-xs md:text-sm min-w-max min-h-full">
         <div
           aria-hidden
-          className="select-none text-right py-4 px-3 text-muted-foreground/60 border-r border-border tabular-nums sticky left-0 z-10"
+          className="select-none text-right py-2 md:py-4 px-2 md:px-3 text-muted-foreground/40 border-r border-border/50 tabular-nums sticky left-0 z-10"
           style={{ background: "var(--code-bg)" }}
         >
           {lines.map((_, i) => (
-            <div key={i} className="leading-6">
+            <div key={i} className="leading-5 md:leading-6">
               {i + 1}
             </div>
           ))}
@@ -39,8 +39,8 @@ export function JsonEditor({
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
           wrap="off"
-          rows={Math.max(lines.length, 18)}
-          className="flex-1 min-w-[600px] py-4 px-4 leading-6 bg-transparent outline-none resize-none whitespace-pre overflow-hidden"
+          rows={Math.max(lines.length, 12)}
+          className="flex-1 min-w-[500px] md:min-w-[800px] py-2 md:py-4 px-3 md:px-4 leading-5 md:leading-6 bg-transparent outline-none resize-none whitespace-pre overflow-visible"
           style={{ color: "var(--code-string)" }}
         />
       </div>
@@ -51,7 +51,7 @@ export function JsonEditor({
 export function JsonViewer({ data }: { data: unknown }) {
   return (
     <pre
-      className="rounded-xl p-4 overflow-auto text-xs font-mono leading-6 max-h-[400px] scrollbar-thin"
+      className="h-full w-full p-4 overflow-auto text-xs font-mono leading-6 scrollbar-thin"
       style={{ background: "var(--code-bg)" }}
     >
       {renderJson(data, 0)}
