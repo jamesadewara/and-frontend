@@ -184,10 +184,11 @@ function EditorPanel({
 }) {
   const templates = mode === "review" ? REVIEW_TEMPLATES : RECOMMEND_TEMPLATES;
   const keys = Object.keys(templates);
-  const [selected, setSelected] = useState<string>(keys[0]);
+  const defaultKey = keys.includes("Blank Template") ? "Blank Template" : keys[0];
+  const [selected, setSelected] = useState<string>(defaultKey);
 
   useEffect(() => {
-    setSelected(keys[0]);
+    setSelected(defaultKey);
   }, [mode]); // eslint-disable-line
 
   const onPick = (name: string) => {
