@@ -394,6 +394,35 @@ function Workspace() {
           </div>
         </div>
       )}
+
+      {resultOpen && result && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col animate-fade-up">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <button
+              onClick={() => setResultOpen(false)}
+              className="inline-flex items-center gap-2 text-sm rounded-full glass px-3 py-1.5 hover:border-primary/40 transition"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+            <p className="font-semibold text-sm sm:text-base">
+              {mode === "review" ? "Review Agent Output" : "Recommendation Agent Output"}
+            </p>
+            <div className="w-[72px]" />
+          </div>
+          <div className="flex-1 overflow-auto p-4 sm:p-8">
+            <div className="mx-auto max-w-4xl glass rounded-2xl p-5 sm:p-8">
+              <p className="text-xs uppercase tracking-widest text-primary mb-4">Final Output</p>
+              {typeof result?.output?.predicted_rating === "number" && (
+                <div className="mb-4">
+                  <StarRating value={result.output.predicted_rating} />
+                </div>
+              )}
+              <JsonViewer data={result} />
+              <ResultActions data={result} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
