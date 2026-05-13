@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Copy, Download, FileJson, Loader2, MessageSquare, Send, Star, Target, X,
+  ArrowLeft, Copy, Download, FileJson, Loader2, MessageSquare, Send, Star, Target, X,
 } from "lucide-react";
 import { TopNav } from "@/components/site-nav";
 import { JsonEditor, JsonViewer } from "@/components/json-editor";
