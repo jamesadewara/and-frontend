@@ -307,6 +307,7 @@ function Workspace() {
                     setResult(response);
                     setPhase("done");
                     setSubmitting(false);
+                    setResultOpen(true);
                   }, 500)
                 );
               }
