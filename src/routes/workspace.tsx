@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Copy, Download, FileJson, Loader2, MessageSquare, Send, Star, Target, X,
+  ArrowLeft, Copy, Download, FileJson, Loader2, MessageSquare, Send, Star, Target, X,
 } from "lucide-react";
 import { TopNav } from "@/components/site-nav";
 import { JsonEditor, JsonViewer } from "@/components/json-editor";
@@ -184,10 +184,11 @@ function EditorPanel({
 }) {
   const templates = mode === "review" ? REVIEW_TEMPLATES : RECOMMEND_TEMPLATES;
   const keys = Object.keys(templates);
-  const [selected, setSelected] = useState<string>(keys[0]);
+  const defaultKey = keys.includes("Blank Template") ? "Blank Template" : keys[0];
+  const [selected, setSelected] = useState<string>(defaultKey);
 
   useEffect(() => {
-    setSelected(keys[0]);
+    setSelected(defaultKey);
   }, [mode]); // eslint-disable-line
 
   const onPick = (name: string) => {
@@ -249,25 +250,26 @@ function EditorPanel({
 function Workspace() {
   const [mode, setMode] = useState<Mode>("review");
   const [value, setValue] = useState<string>(() =>
-    JSON.stringify(REVIEW_TEMPLATES["The Lagos Haggler"], null, 2)
+    JSON.stringify(REVIEW_TEMPLATES["Blank Template"], null, 2)
   );
   const [phase, setPhase] = useState<Phase>("intro");
   const [streamed, setStreamed] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const timers = useRef<number[]>([]);
 
   useEffect(() => {
-    // reset on mode switch
     const def = mode === "review"
-      ? REVIEW_TEMPLATES["The Lagos Haggler"]
-      : RECOMMEND_TEMPLATES["Cold-Start Haggler"];
+      ? REVIEW_TEMPLATES["Blank Template"]
+      : RECOMMEND_TEMPLATES["Blank Template"];
     setValue(JSON.stringify(def, null, 2));
     setPhase("intro");
     setStreamed([]);
     setResult(null);
     setSubmitting(false);
+    setResultOpen(false);
     timers.current.forEach(clearTimeout);
     timers.current = [];
   }, [mode]);
@@ -305,6 +307,7 @@ function Workspace() {
                     setResult(response);
                     setPhase("done");
                     setSubmitting(false);
+                    setResultOpen(true);
                   }, 500)
                 );
               }
@@ -388,6 +391,35 @@ function Workspace() {
               missing={validation.missing}
               submitting={submitting}
             />
+          </div>
+        </div>
+      )}
+
+      {resultOpen && result && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col animate-fade-up">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <button
+              onClick={() => setResultOpen(false)}
+              className="inline-flex items-center gap-2 text-sm rounded-full glass px-3 py-1.5 hover:border-primary/40 transition"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+            <p className="font-semibold text-sm sm:text-base">
+              {mode === "review" ? "Review Agent Output" : "Recommendation Agent Output"}
+            </p>
+            <div className="w-[72px]" />
+          </div>
+          <div className="flex-1 overflow-auto p-4 sm:p-8">
+            <div className="mx-auto max-w-4xl glass rounded-2xl p-5 sm:p-8">
+              <p className="text-xs uppercase tracking-widest text-primary mb-4">Final Output</p>
+              {typeof result?.output?.predicted_rating === "number" && (
+                <div className="mb-4">
+                  <StarRating value={result.output.predicted_rating} />
+                </div>
+              )}
+              <JsonViewer data={result} />
+              <ResultActions data={result} />
+            </div>
           </div>
         </div>
       )}

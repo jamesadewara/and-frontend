@@ -19,13 +19,14 @@ export function JsonEditor({
 
   return (
     <div
-      className={`rounded-xl overflow-hidden border-2 ${borderColor} transition-colors`}
+      className={`rounded-xl border-2 ${borderColor} transition-colors overflow-auto max-h-[60vh] scrollbar-thin`}
       style={{ background: "var(--code-bg)" }}
     >
-      <div className="flex font-mono text-sm">
+      <div className="flex font-mono text-sm min-w-max">
         <div
           aria-hidden
-          className="select-none text-right py-4 px-3 text-muted-foreground/60 border-r border-border tabular-nums"
+          className="select-none text-right py-4 px-3 text-muted-foreground/60 border-r border-border tabular-nums sticky left-0 z-10"
+          style={{ background: "var(--code-bg)" }}
         >
           {lines.map((_, i) => (
             <div key={i} className="leading-6">
@@ -37,7 +38,9 @@ export function JsonEditor({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
-          className="flex-1 min-h-[420px] py-4 px-4 leading-6 bg-transparent outline-none resize-none scrollbar-thin"
+          wrap="off"
+          rows={Math.max(lines.length, 18)}
+          className="flex-1 min-w-[600px] py-4 px-4 leading-6 bg-transparent outline-none resize-none whitespace-pre overflow-hidden"
           style={{ color: "var(--code-string)" }}
         />
       </div>
