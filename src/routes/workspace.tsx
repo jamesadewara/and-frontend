@@ -250,25 +250,26 @@ function EditorPanel({
 function Workspace() {
   const [mode, setMode] = useState<Mode>("review");
   const [value, setValue] = useState<string>(() =>
-    JSON.stringify(REVIEW_TEMPLATES["The Lagos Haggler"], null, 2)
+    JSON.stringify(REVIEW_TEMPLATES["Blank Template"], null, 2)
   );
   const [phase, setPhase] = useState<Phase>("intro");
   const [streamed, setStreamed] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const timers = useRef<number[]>([]);
 
   useEffect(() => {
-    // reset on mode switch
     const def = mode === "review"
-      ? REVIEW_TEMPLATES["The Lagos Haggler"]
-      : RECOMMEND_TEMPLATES["Cold-Start Haggler"];
+      ? REVIEW_TEMPLATES["Blank Template"]
+      : RECOMMEND_TEMPLATES["Blank Template"];
     setValue(JSON.stringify(def, null, 2));
     setPhase("intro");
     setStreamed([]);
     setResult(null);
     setSubmitting(false);
+    setResultOpen(false);
     timers.current.forEach(clearTimeout);
     timers.current = [];
   }, [mode]);
