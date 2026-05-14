@@ -3,13 +3,13 @@
 import { useState } from "react";
 import {
   Check, Copy, Pencil, PenLine, RotateCcw, ChevronDown, Bot as BotIcon,
-  User as UserIcon
+  
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { cn } from "@/src/lib/utils";
-import { type Message, type Block, type Recommendation, type ReviewData } from "@/src/data/workspace-data";
+import { type Message, type Block } from "@/src/data/workspace-data";
 
 function Av() {
   return (
@@ -19,21 +19,13 @@ function Av() {
   );
 }
 
-function UserAv() {
-  return (
-    <div className="size-8 md:size-10 rounded-lg md:rounded-2xl bg-secondary grid place-items-center text-secondary-foreground shrink-0 border border-border">
-      <UserIcon className="size-4 md:size-5" />
-    </div>
-  );
-}
-
 export function Bubble({
-  m, onLoadToEditor, onAnalysis, onReviewSimulator, onRetry
+  m, onLoadToEditor, onReviewSimulator, onRetry
 }: {
   m: Message;
-  onLoadToEditor: (data: any) => void;
-  onAnalysis: (r: Recommendation, chain?: string[]) => void;
-  onReviewSimulator: (data: ReviewData) => void;
+  onLoadToEditor: (data: unknown) => void;
+  onAnalysis: (r: unknown, chain?: string[]) => void;
+  onReviewSimulator: (data: unknown) => void;
   onRetry: (text: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -42,7 +34,8 @@ export function Bubble({
 
   const handleCopy = () => {
     const json = m.from === 'user' ? m.metadata?.payload : (m.metadata?.full_response || m.metadata?.review);
-    const content = json ? (typeof json === 'string' ? json : JSON.stringify(json, null, 2)) : ((m.blocks.find(b => b.kind === 'text') as any)?.text || "");
+    const textBlock = m.blocks.find(b => b.kind === 'text') as Extract<Block, { kind: 'text' }> | undefined;
+    const content = json ? (typeof json === 'string' ? json : JSON.stringify(json, null, 2)) : (textBlock?.text || "");
     navigator.clipboard.writeText(content);
     setCopied(true);
     toast.success(json ? "JSON copied to clipboard" : "Text copied to clipboard");
@@ -129,20 +122,20 @@ export function Bubble({
           </button>
           <div className="h-3 w-px bg-border mx-0.5" />
           <button
-            onClick={() => onRetry(m.blocks.find(b => b.kind === 'text') ? ((m.blocks.find(b => b.kind === 'text') as any).text || "").slice(0, 120) : "")}
+            onClick={() => {
+              const retryBlock = m.blocks.find(b => b.kind === 'text') as Extract<Block, { kind: 'text' }> | undefined;
+              onRetry(retryBlock ? (retryBlock.text || "").slice(0, 120) : "");
+            }}
             title="Retry"
             className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent hover:border-border transition-all"
           >
             <RotateCcw className="h-3 w-3" /> Retry
           </button>
-          {m.hasSimulator && (
+          {!!(m.hasSimulator || m.metadata?.resultId) && (
             <>
               <div className="h-3 w-px bg-border mx-0.5" />
               <button
-                onClick={() => {
-                  const data = m.metadata?.full_response || m.metadata?.review;
-                  if (data) onReviewSimulator(data);
-                }}
+                onClick={() => onReviewSimulator(m.metadata)}
                 className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold text-primary hover:bg-primary/10 border border-primary/20 transition-all shadow-sm"
               >
                 <PenLine className="h-3 w-3" /> View Output

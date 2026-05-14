@@ -1,21 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Copy, Download, FileJson, Loader2, MessageSquare, Send, Star, Target, X, Terminal, Trash2
+  FileJson, Loader2, Send, X, Terminal, Trash2
 } from "lucide-react";
 import { TopNav } from "@/src/components/site-nav";
-import { JsonEditor, JsonViewer } from "@/src/components/json-editor";
-import { config } from "@/src/lib/config";
 import {
   REVIEW_TEMPLATES,
-  validatePayload, type Mode, type Message,
+  validatePayload, type Mode, type Message, type AgentResponse,
   RECOMMEND_TEMPLATES
 } from "@/src/data/workspace-data";
 
 import { ModeSwitch } from "./components/mode-switch";
-import { StarRating } from "./components/star-rating";
-import { ResultActions } from "./components/result-actions";
 import { AgentPanel } from "./components/agent-panel";
 import { EditorPanel } from "./components/editor-panel";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/src/components/ui/resizable";
@@ -32,24 +29,36 @@ import {
 import { cn } from "@/src/lib/utils";
 
 export default function WorkspaceClient() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("review");
-  const [value, setValue] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`and_payload_${mode}`);
-      if (saved) return saved;
-    }
-    return JSON.stringify(REVIEW_TEMPLATES["Blank Template"], null, 2);
-  });
+  const [value, setValue] = useState<string>(JSON.stringify(REVIEW_TEMPLATES["Blank Template"], null, 2));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [resultOpen, setResultOpen] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
 
+  // Load initial state on mount
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (typeof window === "undefined") return;
+
+    // Load messages
+    const savedMessages = localStorage.getItem("and_messages");
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages));
+      } catch (e) {
+        console.error("Failed to load corrupted messages", e);
+        localStorage.removeItem("and_messages");
+        toast.error("Message history was corrupted and has been reset.");
+      }
+    }
+
+    // Load payload for current mode
+    const savedPayload = localStorage.getItem(`and_payload_${mode}`);
+    if (savedPayload) {
+      setValue(savedPayload);
+    }
+  }, []); // Only on mount
 
   const {
     submit: runStream,
@@ -78,41 +87,32 @@ export default function WorkspaceClient() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Persistence
+  // Persist payload to localStorage whenever it changes
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem("and_messages");
-    if (saved) {
-      try {
-        setMessages(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load messages", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("and_messages", JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+    // Debounce or at least ensure we don't write during initial load if possible
     localStorage.setItem(`and_payload_${mode}`, value);
   }, [value, mode]);
 
+  // When mode changes, load the saved payload for that mode
   useEffect(() => {
-    const def = mode === "review"
-      ? REVIEW_TEMPLATES["Blank Template"]
-      : RECOMMEND_TEMPLATES["Blank Template"];
     const saved = localStorage.getItem(`and_payload_${mode}`);
-    setValue(saved || JSON.stringify(def, null, 2));
+    if (saved) {
+      setValue(saved);
+    } else {
+      const def = mode === "review"
+        ? REVIEW_TEMPLATES["Blank Template"]
+        : RECOMMEND_TEMPLATES["Blank Template"];
+      setValue(JSON.stringify(def, null, 2));
+    }
 
-    setPhase("intro");
-    setStreamedSteps([]);
-    setResult(null);
-    setIsSubmitting(false);
-    setResultOpen(false);
+    startTransition(() => {
+      setPhase("intro");
+      setStreamedSteps([]);
+      setResult(null);
+      setIsSubmitting(false);
+    });
+
     cancelStream();
   }, [mode, cancelStream, setPhase, setStreamedSteps, setResult, setIsSubmitting]);
 
@@ -137,7 +137,46 @@ export default function WorkspaceClient() {
     toast.success("Chat history cleared");
   };
 
+  const generateId = useCallback(() => Math.random().toString(36).substring(7), []);
+
+  const createTimestamp = useCallback(() => Date.now(), []);
+
+  const persistMessages = useCallback((newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+    setMessages((prev) => {
+      const next = typeof newMessages === "function" ? newMessages(prev) : newMessages;
+      if (typeof window !== "undefined") {
+        try {
+          // Truncate metadata if it's too large to prevent localStorage overflow/truncation
+          const sanitized = next.map(m => ({
+            ...m,
+            metadata: m.metadata ? {
+              ...m.metadata,
+              reasoning_chain: (m.metadata.reasoning_chain as string[] | undefined)?.slice(-50) // Only keep last 50 steps per message
+            } : undefined
+          })).slice(-30); // Keep only last 30 messages in history
+
+          localStorage.setItem("and_messages", JSON.stringify(sanitized));
+        } catch (e) {
+          console.error("Failed to persist messages", e);
+          // If quota exceeded, try saving without reasoning chain at all
+          try {
+            const stripped = next.map(m => ({ ...m, metadata: { ...m.metadata, reasoning_chain: [] } })).slice(-10);
+            localStorage.setItem("and_messages", JSON.stringify(stripped));
+          } catch (e2) {
+            localStorage.removeItem("and_messages");
+          }
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const submit = async () => {
+    if (!value.trim() || value.trim().length < 20) {
+      toast.warning("Payload is too short. Please provide at least 20 characters.");
+      return;
+    }
+
     if (status !== "valid") {
       const errorMsg = validation.parseError
         ? "JSON Syntax Error"
@@ -150,19 +189,89 @@ export default function WorkspaceClient() {
 
     // Add user message
     const userMsg: Message = {
-      id: Math.random().toString(36).substring(7),
+      id: generateId(),
       from: "user",
-      blocks: [{ kind: "text", text: `Mode: ${mode}\nPayload: ${value.slice(0, 100)}...` }],
-      timestamp: Date.now(),
+      mode: mode,
+      blocks: [{
+        kind: "text",
+        text: `🚀 [TASK: ${mode.toUpperCase()}] Request Submitted\n` +
+          `Target: ${(() => {
+            try {
+              const parsed = JSON.parse(value);
+              return parsed.user_persona?.name || parsed.persona?.name || "Unknown User";
+            } catch (e) {
+              return "Custom Payload";
+            }
+          })()}\n` +
+          `Payload Length: ${value.length} characters`
+      }],
+      timestamp: createTimestamp(),
       metadata: { payload: value }
     };
-    setMessages(prev => [...prev, userMsg]);
+    persistMessages((prev) => [...prev, userMsg]);
 
     setMobileOpen(false);
 
     try {
-      const parsed = JSON.parse(value);
-      await runStream(parsed);
+      // Handle both JSON and plain text modes
+      let payload: unknown;
+      if (validation.isTextMode) {
+        // Plain text mode — send as string wrapped in request format
+        if (mode === "review") {
+          payload = {
+            user_persona: {
+              name: "Nigerian User",
+              archetype: "default_consumer",
+              budget: 10000.0,
+              interests: [],
+              traits: [],
+              tone: "conversational",
+              style_sample: "",
+              nigerian_context: true,
+              price_sensitivity: "medium",
+              past_reviews: []
+            },
+            product: {
+              name: "Product",
+              category: "General",
+              description: value,
+              image_url: null,
+              price: 0.0
+            }
+          };
+          addLog(`[TASK A] Text mode review request: "${value.slice(0, 50)}..."`, 'info');
+        } else {
+          // Task B: Recommendation
+          payload = {
+            user_persona: {
+              name: "Nigerian User",
+              location: "Nigeria",
+              archetype: "default_consumer",
+              interests: [],
+              traits: [],
+              tone: "conversational",
+              style_sample: null,
+              nigerian_context: true,
+              budget: 10000.0,
+              price_sensitivity: "medium",
+              past_reviews: []
+            },
+            context: {
+              location: "Nigeria",
+              time_of_day: "day",
+              occasion: value,
+              conversation_history: []
+            }
+          };
+          addLog(`[TASK B] Text mode recommendation request: "${value.slice(0, 50)}..."`, 'info');
+        }
+      } else {
+        // JSON mode — use parsed data
+        payload = JSON.parse(value);
+        addLog(`JSON mode request submitted`, 'info');
+      }
+      addLog(`Payload structure validated. Starting ${mode} stream...`, 'success');
+      await runStream(payload);
     } catch (e) {
       console.error("Submission failed", e);
       toast.error("Submission failed. Check console for details.");
@@ -170,34 +279,66 @@ export default function WorkspaceClient() {
     }
   };
 
-  // Watch for result to append agent message
+  // Watch for result to navigate to result page
   useEffect(() => {
     if (result && phase === "done") {
-      setResultOpen(true);
+      const typedResult = result as AgentResponse;
+      const isReview = mode === "review";
+      const resultId = `${mode}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const agentMsg: Message = {
-        id: Math.random().toString(36).substring(7),
+        id: generateId(),
         from: "agent",
+        mode: mode,
         blocks: [
-          { kind: "text", text: result.review_text || "Recommendations ready." },
-          ...(result.recommendations ? result.recommendations.map((r: any) => ({ kind: "rec" as const, data: r })) : [])
+          {
+            kind: "text",
+            text: `✅ [${mode.toUpperCase()} COMPLETE] ${new Date().toLocaleTimeString()}\n` +
+              (isReview
+                ? `Generated a culturally grounded review with ${typedResult.predicted_rating} stars.`
+                : `Identified ${typedResult.recommendations?.length || 0} personalized recommendations.`)
+          },
+          ...(typedResult.recommendations ? typedResult.recommendations.map((r) => ({ kind: "rec" as const, data: r })) : [])
         ],
         timestamp: Date.now(),
         hasAnalysis: true,
         hasSimulator: mode === "review",
         metadata: {
-          recommendations: result.recommendations,
+          resultId: resultId,
+          recommendations: typedResult.recommendations,
           reasoning_chain: streamed,
-          review: result,
-          full_response: result
+          review: typedResult,
+          full_response: typedResult
         }
       };
-      setMessages(prev => [...prev, agentMsg]);
-    }
-  }, [result, phase, mode, streamed]);
 
-  const handleOpenSimulator = (data: any) => {
-    setResult(data);
-    setResultOpen(true);
+      startTransition(() => {
+        // Store result in sessionStorage
+        const resultData = {
+          mode,
+          result: typedResult,
+          reasoning: streamed,
+          timestamp: Date.now()
+        };
+        sessionStorage.setItem(`and_result_${resultId}`, JSON.stringify(resultData));
+
+        // Add message to history and persist immediately before navigation
+        persistMessages((prev) => [...prev, agentMsg]);
+
+        // Navigate to result page
+        setTimeout(() => {
+          router.push(`/workspace/${resultId}`);
+        }, 100);
+      });
+    }
+  }, [result, phase, mode, streamed, generateId, router, persistMessages]);
+
+  const handleViewOutput = (metadata: any) => {
+    if (metadata?.resultId) {
+      router.push(`/workspace/${metadata.resultId}`);
+    } else if (metadata?.review || metadata?.recommendations) {
+      setResult((metadata.review || metadata.recommendations) as AgentResponse);
+    }
   };
 
   const handleRetry = (text: string) => {
@@ -205,22 +346,28 @@ export default function WorkspaceClient() {
     submit();
   };
 
-  const handleLoadToEditor = (data: any) => {
+  const handleLoadToEditor = (data: unknown) => {
     const json = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     setValue(json);
     toast.success("Loaded to editor");
   };
 
-  const [consoleLogs, setConsoleLogs] = useState<{ id: string; type: 'info' | 'warn' | 'error' | 'success' | 'system'; msg: string; time: string }[]>([
-    { id: '1', type: 'system', msg: 'Initializing AnD Agent Node v1.0.4...', time: new Date().toLocaleTimeString([], { hour12: false }) },
-    { id: '2', type: 'system', msg: `Active node configuration: ${mode.toUpperCase()}`, time: new Date().toLocaleTimeString([], { hour12: false }) }
-  ]);
+  const [consoleLogs, setConsoleLogs] = useState<{ id: string; type: 'info' | 'warn' | 'error' | 'success' | 'system'; msg: string; time: string; task: 'A' | 'B' | 'both' }[]>([]);
 
-  const addLog = useCallback((msg: string, type: 'info' | 'warn' | 'error' | 'success' | 'system' = 'info') => {
+  const addLog = useCallback((msg: string, type: 'info' | 'warn' | 'error' | 'success' | 'system' = 'info', targetTask?: 'A' | 'B' | 'both') => {
+    const task = targetTask || (mode === 'review' ? 'A' : 'B');
     setConsoleLogs(prev => [
       ...prev,
-      { id: Math.random().toString(36).substring(7), type, msg, time: new Date().toLocaleTimeString([], { hour12: false }) }
+      { id: generateId(), type, msg, time: new Date().toLocaleTimeString([], { hour12: false }), task }
     ].slice(-100)); // Keep last 100 logs
+  }, [mode, generateId, setConsoleLogs]);
+
+  // Initial logs
+  useEffect(() => {
+    if (consoleLogs.length === 0) {
+      addLog('Initializing AnD Agent Node v1.0.4...', 'system', 'both');
+      addLog(`Active node configuration: ${mode.toUpperCase()}`, 'system', mode === 'review' ? 'A' : 'B');
+    }
   }, []);
 
   const clearConsole = () => {
@@ -233,20 +380,34 @@ export default function WorkspaceClient() {
   }, [mode, addLog]);
 
   useEffect(() => {
-    if (streamError) addLog(streamError, 'error');
+    if (streamError) {
+      addLog(`[ERROR] ${streamError}`, 'error');
+    }
   }, [streamError, addLog]);
 
   useEffect(() => {
-    if (validation.parseError) addLog(`JSON Error: ${validation.parseError}`, 'error');
+    if (phase === 'loading') {
+      addLog(`Connecting to agent stream...`, 'info');
+    } else if (phase === 'streaming') {
+      addLog(`Streaming reasoning steps...`, 'success');
+    } else if (phase === 'done') {
+      addLog(`Stream complete. Result received.`, 'success');
+    }
+  }, [phase, mode, addLog]);
+
+  useEffect(() => {
+    if (validation.parseError) {
+      addLog(`[VALIDATION] JSON Error: ${validation.parseError}`, 'error');
+    }
     if (validation.missing.length > 0) {
-      validation.missing.forEach(m => addLog(`Missing field: ${m}`, 'warn'));
+      validation.missing.forEach(m => addLog(`[VALIDATION] Missing field: ${m}`, 'warn'));
     }
   }, [validation.parseError, validation.missing, addLog]);
 
   const [consoleHeight, setConsoleHeight] = useState(350);
   const isResizing = useRef(false);
 
-  const startResizing = (e: React.MouseEvent) => {
+  const startResizing = () => {
     isResizing.current = true;
     document.addEventListener("mousemove", handleResizing);
     document.addEventListener("mouseup", stopResizing);
@@ -266,18 +427,26 @@ export default function WorkspaceClient() {
     document.removeEventListener("mouseup", stopResizing);
   };
 
-  if (!isMounted) return null;
-
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background selection:bg-primary/20 relative">
       <TopNav>
         <div className="">
-          <ModeSwitch mode={mode} setMode={setMode} />
+          <ModeSwitch
+            mode={mode}
+            setMode={(newMode) => {
+              if (submitting) {
+                toast.error("Please wait for the current agent to finish or stop it first.");
+                return;
+              }
+              setMode(newMode);
+            }}
+            disabled={submitting}
+          />
         </div>
       </TopNav>
 
       {/* DESKTOP */}
-      <main className="hidden md:flex flex-1 mx-auto max-w-[1440px] w-full p-6 gap-0 overflow-hidden">
+      <main className="hidden md:flex flex-1 mx-auto max-w-360 w-full p-6 gap-0 overflow-hidden">
         <ResizablePanelGroup orientation="horizontal">
           <ResizablePanel defaultSize={400} minSize={380}>
             <AgentPanel
@@ -288,6 +457,7 @@ export default function WorkspaceClient() {
               status={status}
               submitting={submitting}
               onSubmit={submit}
+              onCancel={cancelStream}
               consoleOpen={consoleOpen}
               setConsoleOpen={setConsoleOpen}
               messages={messages}
@@ -297,7 +467,7 @@ export default function WorkspaceClient() {
               typing={submitting && phase !== "done"}
               isLive={isLive}
               onClearMessages={clearMessages}
-              onOpenSimulator={handleOpenSimulator}
+              onOpenSimulator={handleViewOutput}
             />
           </ResizablePanel>
 
@@ -321,7 +491,7 @@ export default function WorkspaceClient() {
       </main>
 
       {/* MOBILE */}
-      <main className="md:hidden flex-1 flex flex-col overflow-hidden relative bg-secondary/5">
+      <main className="md:hidden flex-1 flex flex-col overflow-hidden relative bg-secondary/5 overflow-x-hidden">
         <div className="flex-1 overflow-hidden relative">
           <div className="h-full p-0 md:p-4 overflow-hidden">
             <AgentPanel
@@ -332,6 +502,7 @@ export default function WorkspaceClient() {
               status={status}
               submitting={submitting}
               onSubmit={submit}
+              onCancel={cancelStream}
               consoleOpen={consoleOpen}
               setConsoleOpen={setConsoleOpen}
               messages={messages}
@@ -341,14 +512,14 @@ export default function WorkspaceClient() {
               typing={submitting && phase !== "done"}
               isLive={isLive}
               onClearMessages={clearMessages}
-              onOpenSimulator={handleOpenSimulator}
+              onOpenSimulator={handleViewOutput}
               hideFooterOnMobile
             />
           </div>
 
           {/* Floating Mobile Controls */}
           <div className="absolute bottom-3 left-3 right-3 flex flex-row items-center justify-center gap-1.5 pointer-events-none">
-            <div className="pointer-events-auto flex-1 max-w-[150px]">
+            <div className="pointer-events-auto flex-1 max-w-37.5">
               <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
                 <DrawerTrigger asChild>
                   <button className="w-full glass rounded-xl py-3 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg border-primary/10 hover:bg-primary/5 transition-all bg-primary/10 text-primary">
@@ -383,9 +554,9 @@ export default function WorkspaceClient() {
 
                     <div className="p-4 border-t border-border/10 bg-secondary/5">
                       <button
-                        disabled={status !== "valid" || submitting}
+                        disabled={status === "invalid" || submitting}
                         onClick={submit}
-                        className={`w-full rounded-xl py-4 font-bold text-sm transition-all flex items-center justify-center gap-3 shadow-xl ${status === 'valid' && !submitting ? 'bg-primary text-primary-foreground shadow-primary/30 hover:scale-[1.02] active:scale-[0.98]' : 'bg-secondary text-muted-foreground opacity-50'}`}
+                        className={`w-full rounded-xl py-4 font-bold text-sm transition-all flex items-center justify-center gap-3 shadow-xl ${status !== 'invalid' && !submitting ? 'bg-primary text-primary-foreground shadow-primary/30 hover:scale-[1.02] active:scale-[0.98]' : 'bg-secondary text-muted-foreground opacity-50'}`}
                       >
                         {submitting ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
                         {submitting ? "Agent Processing..." : "Submit to Agent"}
@@ -398,7 +569,7 @@ export default function WorkspaceClient() {
 
             <button
               onClick={() => setConsoleOpen(true)}
-              className="pointer-events-auto flex-1 max-w-[150px] glass rounded-xl py-3 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border-border/40 hover:bg-secondary/50 transition-all text-muted-foreground shadow-sm"
+              className="pointer-events-auto flex-1 max-w-37.5 glass rounded-xl py-3 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border-border/40 hover:bg-secondary/50 transition-all text-muted-foreground shadow-sm"
             >
               <Terminal className="size-3" />
               Console
@@ -462,80 +633,63 @@ export default function WorkspaceClient() {
               </div>
             </div>
 
-            {/* LOG ENTRIES */}
-            <div className="space-y-1.5">
-              {consoleLogs.map(log => (
-                <div key={log.id} className="flex gap-2 py-0.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                  <span className="shrink-0 text-muted-foreground/40 text-[10px]">[{log.time}]</span>
-                  <span className={cn(
-                    "font-medium",
-                    log.type === 'error' && "text-red-400",
-                    log.type === 'warn' && "text-yellow-400",
-                    log.type === 'success' && "text-emerald-400",
-                    log.type === 'system' && "text-primary/70",
-                    log.type === 'info' && "text-[#e6edf3]/80"
-                  )}>
-                    {log.type === 'error' && "❌ "}
-                    {log.type === 'warn' && "⚠️ "}
-                    {log.type === 'success' && "✅ "}
-                    {log.type === 'system' && "# "}
-                    {log.msg}
-                  </span>
+            {/* SPLIT LOG VIEW */}
+            <div className="grid grid-cols-2 gap-6 h-[calc(100%-100px)]">
+              {/* Task A Logs */}
+              <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-none border-r border-white/5 pr-4">
+                <div className="text-[9px] font-bold text-primary/40 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <div className="size-1 rounded-full bg-primary/40" />
+                  Review Stream (A)
                 </div>
-              ))}
+                {consoleLogs.filter(l => l.task === 'A' || l.task === 'both').map(log => (
+                  <div key={log.id} className="flex gap-2 py-0.5 animate-in fade-in slide-in-from-left-1 duration-200">
+                    <span className="shrink-0 text-muted-foreground/30 text-[9px] w-12">[{log.time}]</span>
+                    <span className={cn(
+                      "font-medium",
+                      log.type === 'error' && "text-red-400",
+                      log.type === 'warn' && "text-yellow-400",
+                      log.type === 'success' && "text-emerald-400",
+                      log.type === 'system' && "text-primary/70",
+                      log.type === 'info' && "text-[#e6edf3]/80"
+                    )}>
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                {submitting && mode === "review" && (
+                  <div className="text-primary/60 text-[10px] animate-pulse mt-2 font-bold"># PROCESSING...</div>
+                )}
+              </div>
 
-              {submitting && (
-                <div className="text-primary animate-pulse flex gap-2 py-1 border-y border-primary/10 bg-primary/5 mt-2">
-                  <span className="shrink-0 text-primary/50 text-[10px]">[{new Date().toLocaleTimeString([], { hour12: false })}]</span>
-                  <span className="font-bold"># RUNNING AGENT PIPELINE: {phase.toUpperCase()}...</span>
+              {/* Task B Logs */}
+              <div className="flex flex-col gap-1.5 overflow-y-auto scrollbar-none">
+                <div className="text-[9px] font-bold text-primary/40 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <div className="size-1 rounded-full bg-primary/40" />
+                  Recommend Stream (B)
                 </div>
-              )}
-
-              {!submitting && phase === 'done' && (
-                <div className="text-emerald-400 flex gap-2 py-1 bg-emerald-400/5 px-2 rounded mt-2">
-                  <span className="shrink-0 text-emerald-500/50 text-[10px]">[{new Date().toLocaleTimeString([], { hour12: false })}]</span>
-                  <span># SIGNAL PROCESSED. RESPONSE GENERATED SUCCESSFULLY.</span>
-                </div>
-              )}
+                {consoleLogs.filter(l => l.task === 'B' || l.task === 'both').map(log => (
+                  <div key={log.id} className="flex gap-2 py-0.5 animate-in fade-in slide-in-from-left-1 duration-200">
+                    <span className="shrink-0 text-muted-foreground/30 text-[9px] w-12">[{log.time}]</span>
+                    <span className={cn(
+                      "font-medium",
+                      log.type === 'error' && "text-red-400",
+                      log.type === 'warn' && "text-yellow-400",
+                      log.type === 'success' && "text-emerald-400",
+                      log.type === 'system' && "text-primary/70",
+                      log.type === 'info' && "text-[#e6edf3]/80"
+                    )}>
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                {submitting && mode === "recommend" && (
+                  <div className="text-primary/60 text-[10px] animate-pulse mt-2 font-bold"># PROCESSING...</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      {resultOpen && result && (
-        <div className="fixed inset-0 z-[60] bg-background flex flex-col animate-fade-up overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-border bg-card">
-            <button
-              onClick={() => setResultOpen(false)}
-              className="inline-flex items-center gap-2 text-sm rounded-full glass px-3 py-1.5 hover:border-primary/40 transition"
-            >
-              <ArrowLeft className="size-4" /> Back
-            </button>
-            <p className="font-semibold text-sm sm:text-base">
-              {mode === "review" ? "Review Agent Output" : "Recommendation Agent Output"}
-            </p>
-            <div className="w-20" />
-          </div>
-          <div className="flex-1 overflow-hidden p-4 sm:p-8 flex flex-col items-center">
-            <div className="w-full max-w-4xl h-full flex flex-col glass rounded-2xl p-5 sm:p-8 overflow-hidden">
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <p className="text-[10px] uppercase tracking-widest text-primary font-bold">Final Output</p>
-                {typeof result?.output?.predicted_rating === "number" && (
-                  <StarRating value={result.output.predicted_rating} />
-                )}
-              </div>
-              <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col gap-4">
-                <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-border/50">
-                  <JsonViewer data={result} />
-                </div>
-                <div className="shrink-0 pt-2">
-                  <ResultActions data={result} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
   description: 'AnD AI is aculturally intelligent AI platform for the Nigerian market.',
   keywords: ['AnD AI', 'Culturally Intelligent AI', 'Nigerian Market', 'Consumer Behavior', 'AI Recommendations'],
-  authors: TEAM.filter((m: TeamMember) => ({ name: m.name, url: m.linkedin || m.github || m.x })),
+  authors: TEAM.filter((m: TeamMember) => ({ name: m.name, url: m.linkedin || m.github || m.x ||m.website })),
   openGraph: {
     title: 'AnD AI',
     description: 'Culturally intelligent AI for the Nigerian market',

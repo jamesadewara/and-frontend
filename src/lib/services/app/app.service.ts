@@ -14,7 +14,7 @@ export async function googleTranslate(text: string, target: string, source = "en
 
 /* ───────── Pending Message Service ───────── */
 
-export const PENDING_KEY = "reko_pending_message";
+export const PENDING_KEY = "and_pending_message";
 
 export type PendingMessage = { text: string; askedAt: number };
 

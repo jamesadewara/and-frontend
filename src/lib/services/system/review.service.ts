@@ -16,12 +16,13 @@ export async function generateReview(payload: ReviewGenerateRequest): Promise<Re
 }
 
 /**
- * Generates a review with streaming reasoning (SSE).
+ * Generates a review with REST API + optional SSE log streaming.
  */
 export async function generateReviewStream(
     payload: ReviewGenerateRequest,
     callbacks: SSECallbacks<Partial<ReviewResponse>>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    traceId?: string
 ) {
-    return streamReview(payload, callbacks, signal);
+    return streamReview(payload, callbacks as SSECallbacks<unknown>, signal, traceId);
 }

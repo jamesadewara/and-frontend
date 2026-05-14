@@ -1,15 +1,15 @@
 "use client";
 
-import { MessageSquare, Target, Send, Loader2, Terminal, ChevronDown, Trash2 } from "lucide-react";
+import { MessageSquare, Target, Send, Loader2, Terminal, ChevronDown, Trash2, Square } from "lucide-react";
 import { Bubble } from "./bubble";
 import { type Mode, type Phase, type AgentResponse, type Message, REVIEW_INTRO, RECOMMEND_INTRO } from "@/src/data/workspace-data";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/src/lib/utils";
 
 export function AgentPanel({
-  mode, phase, streamedSteps, result, status, submitting, onSubmit, consoleOpen, setConsoleOpen,
+  mode, phase, streamedSteps, status, submitting, onSubmit, consoleOpen, setConsoleOpen,
   messages, onLoadToEditor, handleRetry,
-  hasWarnings, typing, isLive, onClearMessages, onOpenSimulator,
+  hasWarnings, typing, isLive, onClearMessages, onOpenSimulator, onCancel,
   hideFooterOnMobile = false
 }: {
   mode: Mode;
@@ -19,22 +19,32 @@ export function AgentPanel({
   status: "valid" | "invalid" | "warning";
   submitting: boolean;
   onSubmit: () => void;
+  onCancel?: () => void;
   consoleOpen: boolean;
   setConsoleOpen: (open: boolean) => void;
   messages: Message[];
-  onLoadToEditor: (data: any) => void;
+  onLoadToEditor: (data: unknown) => void;
   handleRetry: (text: string) => void;
   hasWarnings: boolean;
   typing: boolean;
   isLive: { taskA: boolean; taskB: boolean };
   onClearMessages: () => void;
-  onOpenSimulator: (data: any) => void;
+  onOpenSimulator: (data: unknown) => void;
   hideFooterOnMobile?: boolean;
 }) {
   const intro = mode === "review" ? REVIEW_INTRO : RECOMMEND_INTRO;
   const Icon = mode === "review" ? MessageSquare : Target;
   const [isReasoningExpanded, setIsReasoningExpanded] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const healthy = mode === "review" ? isLive.taskA : isLive.taskB;
+
+useEffect(() => {
+  const frame = requestAnimationFrame(() => {
+    setIsMounted(true);
+  });
+  
+  return () => cancelAnimationFrame(frame);
+}, []);
 
   return (
     <div className="glass rounded-0 md:rounded-2xl h-full flex flex-col overflow-hidden border-none md:border md:border-border">
@@ -57,10 +67,11 @@ export function AgentPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {messages.length > 0 && (
+          {isMounted && messages.length > 0 && (
             <button
               onClick={onClearMessages}
-              className="p-2 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/40 text-muted-foreground hover:text-destructive transition-all"
+              disabled={submitting}
+              className="p-2 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/40 text-muted-foreground hover:text-destructive transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               title="Clear Chat History"
             >
               <Trash2 className="size-4" />
@@ -70,13 +81,13 @@ export function AgentPanel({
       </div>
 
       <div className={cn("flex-1 overflow-y-auto p-2 md:p-5 space-y-3 md:space-y-8 scrollbar-thin relative", hideFooterOnMobile && "pb-28 md:pb-5")}>
-        {messages.length === 0 && (
+        {isMounted && messages.length === 0 && (
           <div className="rounded-2xl rounded-tl-sm bg-secondary/60 p-4 text-sm whitespace-pre-line animate-fade-up border border-border/50">
             {intro}
           </div>
         )}
 
-        {messages.map((m) => (
+        {isMounted && messages.filter(m => m.mode === mode).map((m) => (
           <Bubble
             key={m.id}
             m={m}
@@ -87,7 +98,7 @@ export function AgentPanel({
           />
         ))}
 
-        {typing && (
+        {isMounted && typing && (
           <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="h-10 w-10 rounded-2xl bg-primary grid place-items-center text-primary-foreground shrink-0 shadow-xl shadow-primary/10 border border-white/10">
               <Icon className="size-5" />
@@ -102,7 +113,7 @@ export function AgentPanel({
           </div>
         )}
 
-        {submitting && phase === "streaming" && (
+        {isMounted && submitting && (phase === "streaming" || phase === "loading") && (
           <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex flex-col gap-2 ml-1">
               <button
@@ -118,17 +129,27 @@ export function AgentPanel({
                 <ChevronDown className={cn("h-3 w-3 transition-transform", isReasoningExpanded && "rotate-180")} />
               </button>
 
-              {isReasoningExpanded && streamedSteps.length > 0 && (
-                <div className="flex flex-col gap-1.5 p-3 rounded-xl md:rounded-2xl rounded-tl-lg bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-500 shadow-inner max-h-[250px] overflow-y-auto scrollbar-none">
+              {isReasoningExpanded && (
+                <div className="flex flex-col gap-1.5 p-3 rounded-xl md:rounded-2xl rounded-tl-lg bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-500 shadow-inner max-h-62.5 overflow-y-auto scrollbar-none">
                   <div className="text-[8px] font-bold text-primary/40 uppercase tracking-[0.2em] mb-1 px-1">Reasoning Log</div>
-                  {streamedSteps.map((step, idx) => (
-                    <div key={idx} className="flex gap-2 text-[10px] leading-tight text-foreground/70 font-medium animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 40}ms` }}>
-                      <div className="size-1.5 rounded-full bg-primary/20 shrink-0 mt-1.5" />
-                      <span className="">{step}</span>
+                  
+                  {streamedSteps.length > 0 ? (
+                    streamedSteps.map((step, idx) => (
+                      <div key={idx} className="flex gap-2 text-[10px] leading-tight text-foreground/70 font-medium animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 40}ms` }}>
+                        <div className="size-1.5 rounded-full bg-primary/20 shrink-0 mt-1.5" />
+                        <span className="">{step}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex gap-2 text-[10px] leading-tight text-primary/40 font-medium italic animate-pulse px-1 py-1">
+                      Connecting to agent signal...
                     </div>
-                  ))}
+                  )}
+
                   <div className="flex items-center gap-2 mt-1 px-1">
-                    <span className="text-[8px] font-bold text-primary/30 animate-pulse uppercase tracking-tighter">Processing...</span>
+                    <span className="text-[8px] font-bold text-primary/30 animate-pulse uppercase tracking-tighter">
+                      {phase === 'loading' ? 'Initializing...' : 'Processing...'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -146,24 +167,38 @@ export function AgentPanel({
           >
             <Terminal className="size-5" />
           </button>
-          {hasWarnings && (
+          {isMounted && hasWarnings && (
             <span className="absolute -top-1 -right-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
             </span>
           )}
         </div>
-        <button
-          disabled={status !== "valid" || submitting}
-          onClick={onSubmit}
-          className={`flex-1 inline-flex items-center justify-center gap-3 rounded-lg md:rounded-xl px-6 py-3 font-bold transition-all ${status === "valid" && !submitting
-            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
-            : "bg-secondary text-muted-foreground cursor-not-allowed opacity-50"
-            }`}
-        >
-          {submitting ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
-          <span>{submitting ? "Agent Thinking..." : "Submit to Agent"}</span>
-        </button>
+        
+        {isMounted && submitting && (
+          <button
+            onClick={onCancel}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg md:rounded-xl px-6 py-3 font-bold bg-red-500/90 text-white hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all animate-pulse"
+            title="Stop the agent thinking process"
+          >
+            <Square className="size-5 fill-current" />
+            <span>Stop</span>
+          </button>
+        )}
+        
+        {isMounted && !submitting && (
+          <button
+            disabled={status === "invalid" || submitting}
+            onClick={onSubmit}
+            className={`flex-1 inline-flex items-center justify-center gap-3 rounded-lg md:rounded-xl px-6 py-3 font-bold transition-all ${status !== "invalid" && !submitting
+              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10 hover:scale-[1.01] active:scale-[0.99]"
+              : "bg-secondary text-muted-foreground cursor-not-allowed opacity-50"
+              }`}
+          >
+            {submitting ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
+            <span>{submitting ? "Agent Thinking..." : "Submit to Agent"}</span>
+          </button>
+        )}
       </div>
     </div>
   );

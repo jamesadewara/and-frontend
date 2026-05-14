@@ -9,7 +9,7 @@ import { googleTranslate } from "@/src/lib/services/app/app.service";
 
 export const AppCtx = createContext<AppContextValue | null>(null);
 
-const KEY = "reko_state_v1";
+const KEY = "and_state_v1";
 const initial: AppState = {
   theme: "light",
   lang: "en",

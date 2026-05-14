@@ -52,7 +52,8 @@ export function EditorPanel({
           </select>
           <button 
             onClick={onClear}
-            className="p-1.5 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/40 text-muted-foreground hover:text-destructive transition-all"
+            disabled={submitting}
+            className="p-1.5 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/40 text-muted-foreground hover:text-destructive transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             title="Clear Payload"
           >
             <Trash2 className="size-3.5" />

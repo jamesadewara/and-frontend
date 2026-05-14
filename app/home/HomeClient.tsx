@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BookOpen, Search, Brain, Sparkles, Star, Target, Github, Linkedin, Twitter, Check, Globe, ChevronDown } from "lucide-react";
+import { ArrowRight, Search, Brain, Sparkles, Star, Target, Github, Linkedin, Twitter, Globe, RocketIcon } from "lucide-react";
 import { TopNav } from "@/src/components/site-nav";
 import Link from "next/link";
 import { TEAM, TeamMember } from "@/src/data";
@@ -121,7 +121,7 @@ export default function HomeClient() {
           <h2 className="text-display text-3xl sm:text-4xl font-bold">Meet the team</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-          {TEAM.filter((m: TeamMember) => !!m.linkedin || !!m.github || !!m.x).map((m) => {
+          {TEAM.filter((m: TeamMember) => !!m.linkedin || !!m.github || !!m.x || !!m.website).map((m) => {
             const initials = m.name
               .split(" ")
               .map((s) => s[0])
@@ -132,17 +132,17 @@ export default function HomeClient() {
                 key={m.name}
                 className="glass rounded-2xl p-6 text-center hover:border-primary/40 transition group relative flex flex-col items-center"
               >
-                <div className="mx-auto size-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 p-1 mb-4 group-hover:scale-105 transition-transform">
+                <div className="mx-auto size-40 rounded-full bg-linear-to-br from-primary/20 to-primary/5 p-1 mb-4 group-hover:scale-105 transition-transform">
                   {m.image ? (
-                    <Image
-                      src={m.image}
-                      alt={m.name}
-                      width={80}
-                      height={80}
-                      className="size-full rounded-full object-cover border-2 border-primary/20"
-                    />
+               <Image
+  src={m.image}
+  alt={m.name}
+  width={240}
+  height={240}
+  className="rounded-full object-cover border-2 border-primary/20 aspect-square h-auto" 
+/>
                   ) : (
-                    <div className="size-full rounded-full bg-gradient-to-br from-primary to-primary/40 grid place-items-center text-primary-foreground text-display text-xl font-bold">
+                    <div className="size-full rounded-full bg-linear-to-br from-primary to-primary/40 grid place-items-center text-primary-foreground text-display text-xl font-bold">
                       {initials}
                     </div>
                   )}
@@ -150,7 +150,7 @@ export default function HomeClient() {
                 <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">
                   {m.name}
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1 mb-4 line-clamp-2 min-h-[2rem]">{m.role}</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-4 line-clamp-2 min-h-8">{m.role}</p>
 
                 <div className="flex items-center gap-3 mt-auto">
                   {m.linkedin && (
@@ -166,6 +166,11 @@ export default function HomeClient() {
                   {m.x && (
                     <a href={m.x} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full glass hover:text-primary transition-colors" title="X (Twitter)">
                       <Twitter className="size-4" />
+                    </a>
+                  )}
+                  {m.website && (
+                    <a href={m.website} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full glass hover:text-primary transition-colors" title="Website">
+                      <Globe className="size-4" />
                     </a>
                   )}
                 </div>
@@ -203,7 +208,7 @@ export default function HomeClient() {
               <span>© {new Date().getFullYear()} AnD AI · Built in Lagos</span>
               <span className="hidden md:inline text-border">|</span>
               <span className="inline-flex items-center gap-2">
-                <Sparkles className="size-4 text-primary" />
+                <RocketIcon className="size-4 text-primary" />
                 DSN × BCT LLM Agent Challenge
               </span>
             </div>

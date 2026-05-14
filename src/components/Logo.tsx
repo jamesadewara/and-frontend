@@ -10,7 +10,7 @@ export default function Logo({ className }: { className?: string }) {
         <Link href="/" className={`flex items-center gap-2 group ring-1 ring-primary/30 group-hover:ring-primary/60 p-1.5 md:p-3 rounded-0 bg-primary/15 ${theme === "dark" ? 'bg-dark' : 'bg-light'} ${className}`}>
             <div className="relative size-8 grid place-items-center transition">
                 <Image
-                    src={"logo.png"}
+                    src={"/logo.png"}
                     alt="AnD AI Logo"
                     width={32}
                     height={32}

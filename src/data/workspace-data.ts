@@ -34,15 +34,16 @@ export type Block =
 export interface Message {
   id: string;
   from: "user" | "agent";
+  mode: Mode;
   blocks: Block[];
   timestamp: number;
   hasAnalysis?: boolean;
   hasSimulator?: boolean;
   metadata?: {
-    recommendations?: any[];
+    recommendations?: unknown[];
     reasoning_chain?: string[];
-    review?: any;
-    [key: string]: any;
+    review?: unknown;
+    [key: string]: unknown;
   };
 }
 
@@ -55,7 +56,7 @@ export interface AgentOutput {
   confidence?: number;
   cold_start_used?: boolean;
   cross_domain?: boolean;
-  style_snapshot?: any;
+  style_snapshot?: unknown;
   [key: string]: unknown;
 }
 
@@ -63,7 +64,7 @@ export interface AgentResponse {
   review_text?: string;
   predicted_rating?: number;
   recommendations?: Recommendation[];
-  reasoning_chain?: any[];
+  reasoning_chain?: unknown[];
   [key: string]: unknown;
 }
 
@@ -93,6 +94,7 @@ export const REVIEW_TEMPLATES: Record<string, unknown> = {
       name: "Oraimo FreePods 3 Wireless Earbuds",
       category: "electronics",
       description: "Bluetooth 5.3 earbuds, 35-hour battery, IPX5, USB-C. Price: ₦24,500.",
+      image_url: null,
       price: 24500,
     },
   },
@@ -114,6 +116,7 @@ export const REVIEW_TEMPLATES: Record<string, unknown> = {
       name: "Signature Amala & Ewedu with Assorted Meats",
       category: "fine_dining",
       description: "Premium Yoruba dish in ceramicware. Goat meat, beef, tripe. ₦8,500.",
+      image_url: null,
       price: 8500,
     },
   },
@@ -142,24 +145,31 @@ export const REVIEW_TEMPLATES: Record<string, unknown> = {
       name: "King of Boys: The Return of the King",
       category: "nollywood",
       description: "Netflix series. Political thriller. 7 episodes. ₦1,200 rental.",
+      image_url: null,
       price: 1200,
     },
   },
   "Blank Template": {
     user_persona: {
-      name: "",
-      location: "",
-      archetype: "",
+      name: "User",
+      location: "Nigeria",
+      archetype: "default_consumer",
       interests: [],
       traits: [],
-      tone: "",
+      tone: "conversational",
       style_sample: "",
       nigerian_context: true,
-      budget: 0,
+      budget: 10000.0,
       price_sensitivity: "medium",
       past_reviews: [],
     },
-    product: { name: "", category: "", description: "", price: 0 },
+    product: {
+      name: "Product Name",
+      category: "General",
+      description: "Enter product description here...",
+      image_url: null,
+      price: 0.0,
+    },
   },
 };
 
@@ -242,18 +252,23 @@ export const RECOMMEND_TEMPLATES: Record<string, unknown> = {
   },
   "Blank Template": {
     user_persona: {
-      name: "",
-      location: "",
-      archetype: "",
+      name: "User",
+      location: "Nigeria",
+      archetype: "default_consumer",
       interests: [],
       traits: [],
-      tone: "",
+      tone: "conversational",
       nigerian_context: true,
-      budget: 0,
+      budget: 10000.0,
       price_sensitivity: "medium",
       past_reviews: [],
     },
-    context: { location: "", time_of_day: "", occasion: "", conversation_history: [] },
+    context: {
+      location: "Lagos",
+      time_of_day: "day",
+      occasion: "Browsing for recommendations",
+      conversation_history: [],
+    },
   },
 };
 
@@ -269,7 +284,36 @@ Give me a user persona and some context — location, occasion, time of day — 
 
 Hit Submit when you're ready.`;
 
-export function validatePayload(mode: Mode, raw: string): { ok: boolean; parseError?: string; missing: string[]; data?: unknown } {
+/**
+ * Detects if input looks like JSON (to determine validation strictness)
+ */
+function looksLikeJson(input: string): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  
+  // Check for JSON structural indicators
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return true;
+  if (/"[^"]*"\s*:\s*/.test(trimmed)) return true;
+  
+  // Try to parse
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function validatePayload(mode: Mode, raw: string): { ok: boolean; parseError?: string; missing: string[]; data?: unknown; isTextMode?: boolean } {
+  const trimmed = raw.trim();
+  
+  // If it's plain text (not JSON), allow it as-is
+  if (!looksLikeJson(raw)) {
+    // Plain text mode — no validation, pass raw string as-is
+    return { ok: true, missing: [], data: { raw_input: trimmed }, isTextMode: true };
+  }
+  
+  // JSON mode — validate structure
   let data: unknown;
   try {
     data = JSON.parse(raw);
@@ -283,6 +327,7 @@ export function validatePayload(mode: Mode, raw: string): { ok: boolean; parseEr
     }
     return { ok: false, missing: [], parseError: line ? `Invalid JSON at line ${line}: ${msg}` : `Invalid JSON: ${msg}` };
   }
+  
   const missing: string[] = [];
   const need = (path: string, val: unknown, type?: string) => {
     if (val === undefined || val === null || val === "") {
@@ -314,5 +359,5 @@ export function validatePayload(mode: Mode, raw: string): { ok: boolean; parseEr
     need("context.time_of_day", c.time_of_day);
     need("context.occasion", c.occasion);
   }
-  return { ok: missing.length === 0, missing, data };
+  return { ok: missing.length === 0, missing, data, isTextMode: false };
 }

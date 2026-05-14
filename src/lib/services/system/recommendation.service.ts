@@ -16,12 +16,13 @@ export async function generateRecommendation(payload: RecommendRequest): Promise
 }
 
 /**
- * Generates recommendations with streaming reasoning (SSE).
+ * Generates recommendations with REST API + optional SSE log streaming.
  */
 export async function generateRecommendationStream(
     payload: RecommendRequest,
     callbacks: SSECallbacks<Partial<RecommendationResponse>>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    traceId?: string
 ) {
-    return streamRecommendation(payload, callbacks, signal);
+    return streamRecommendation(payload, callbacks as SSECallbacks<unknown>, signal, traceId);
 }
