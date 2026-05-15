@@ -30,6 +30,7 @@ export function Bubble({
 }) {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const MAX_LENGTH = 450;
 
   const handleCopy = () => {
@@ -45,8 +46,11 @@ export function Bubble({
   if (m.from === "user") {
     const text = m.blocks.find((b) => b.kind === "text") as Extract<Block, { kind: "text" }> | undefined;
     return (
-      <div className="flex justify-end animate-in fade-in slide-in-from-right-4 duration-500 group relative">
-        <div className="flex flex-col items-end gap-1.5 max-w-[90%] md:max-w-[85%]">
+      <div 
+        className="flex justify-end animate-in fade-in slide-in-from-right-4 duration-500 group relative"
+        onClick={() => setIsActive(!isActive)}
+      >
+        <div className="flex flex-col items-end gap-1.5 max-w-[90%] md:max-w-[85%] cursor-pointer">
           <div className="relative group/content">
             <div className="px-4 py-3 md:px-6 md:py-4 rounded-xl md:rounded-[2.5rem] md:rounded-tr-lg bg-muted text-[13px] md:text-sm leading-relaxed shadow-sm font-medium transition-all group-hover:shadow-md border border-transparent group-hover:border-border/50">
               {(!isExpanded && (text?.text || "").length > MAX_LENGTH) ? (text?.text || "").slice(0, MAX_LENGTH) + "..." : text?.text}
@@ -60,7 +64,10 @@ export function Bubble({
                 </button>
               )}
             </div>
-            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <div className={cn(
+              "absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 transition-all duration-300",
+              isActive ? "opacity-100 pointer-events-auto" : "opacity-0 group-hover:opacity-100"
+            )}>
               <button onClick={handleCopy} className="p-2 rounded-xl bg-card border border-border shadow-sm text-muted-foreground hover:text-primary transition-all hover:scale-110">{copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}</button>
               <button
                 onClick={() => onLoadToEditor(m.metadata?.payload)}
@@ -77,9 +84,12 @@ export function Bubble({
   }
 
   return (
-    <div className="flex gap-3 md:gap-4 animate-in fade-in slide-in-from-left-4 duration-500 group">
+    <div 
+      className="flex gap-3 md:gap-4 animate-in fade-in slide-in-from-left-4 duration-500 group"
+      onClick={() => setIsActive(!isActive)}
+    >
       <Av />
-      <div className="flex-1 min-w-0 space-y-3 md:space-y-5">
+      <div className="flex-1 min-w-0 space-y-3 md:space-y-5 cursor-pointer">
         {m.blocks.map((b, i) => {
           if (b.kind === "text") {
             const aiText = b.text || "";
@@ -105,7 +115,10 @@ export function Bubble({
           return null;
         })}
 
-        <div className="flex items-center gap-1 mt-2 ml-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
+        <div className={cn(
+          "flex items-center gap-1 mt-2 ml-1 transition-all duration-300",
+          isActive ? "opacity-100 pointer-events-auto" : "opacity-0 group-hover:opacity-100"
+        )}>
           <button
             onClick={handleCopy}
             className="p-1.5 rounded-full text-muted-foreground hover:text-primary transition-colors"

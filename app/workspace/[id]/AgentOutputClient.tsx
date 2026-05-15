@@ -120,10 +120,10 @@ export default function AgentOutputClient() {
           </div>
 
           {/* Content */}
-          <div className="w-full flex space-y-4 space-x-2">
+          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Main Output */}
             {isReview ? (
-              <div className="w-full flex-1 space-y-4">
+              <div className="w-full space-y-4">
                 <div className="rounded-lg border border-border bg-card p-4 md:p-6 space-y-4 min-w-0">
                   <h2 className="text-lg font-semibold mb-2">Review Text</h2>
                   <div className="w-full max-w-full overflow-auto max-h-96 scrollbar-thin border rounded-md bg-muted/20 min-w-0">
@@ -241,9 +241,9 @@ export default function AgentOutputClient() {
             )}
 
             {/* Raw JSON */}
-            <div className="rounded-lg border border-border bg-card p-4 md:p-6 min-w-0">
+            <div className="rounded-lg border border-border bg-card p-4 md:p-6 min-w-0 h-auto">
               <h2 className="text-lg font-semibold mb-4">Raw Response</h2>
-              <pre className="bg-secondary/50 rounded p-4 text-xs leading-relaxed max-h-96 overflow-auto scrollbar-thin font-mono w-full min-w-0">
+              <pre className="bg-secondary/50 rounded p-4 text-xs leading-relaxed max-h-180 h-auto overflow-auto scrollbar-thin font-mono w-full min-w-0">
                 {JSON.stringify(result, null, 2)}
               </pre>
             </div>

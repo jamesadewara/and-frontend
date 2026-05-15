@@ -517,29 +517,35 @@ export default function WorkspaceClient() {
             />
           </div>
 
-          {/* Floating Mobile Controls */}
-          <div className="absolute bottom-3 left-3 right-3 flex flex-row items-center justify-center gap-1.5 pointer-events-none">
-            <div className="pointer-events-auto flex-1 max-w-37.5">
+          {/* Integrated Mobile Action Bar (Chatbot-style) */}
+          <div className="absolute bottom-6 left-4 right-4 pointer-events-none flex justify-center">
+            <div className="pointer-events-auto w-full max-w-md bg-background/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-[2rem] p-1.5 flex items-center gap-1">
               <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
                 <DrawerTrigger asChild>
-                  <button className="w-full glass rounded-xl py-3 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg border-primary/10 hover:bg-primary/5 transition-all bg-primary/10 text-primary">
-                    <FileJson className="size-3" />
-                    Payload
+                  <button className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-[1.5rem] hover:bg-primary/5 transition-all group text-left border border-transparent active:border-primary/20 active:bg-primary/5">
+                    <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center group-active:scale-90 transition-transform">
+                      <FileJson className="size-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">Payload</span>
+                      <span className="text-[9px] text-muted-foreground/60 font-bold">Configure</span>
+                    </div>
                   </button>
                 </DrawerTrigger>
-                <DrawerContent className="h-[92vh] border-none glass-dark">
+                <DrawerContent className="h-[94vh] border-none glass-dark rounded-t-[3rem]">
                   <div className="flex flex-col h-full overflow-hidden">
-                    <DrawerHeader className="px-4 pt-4 pb-2">
+                    <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-1 mb-0" />
+                    <DrawerHeader className="px-6 pt-0 pb-0">
                       <div className="flex items-center justify-between">
-                        <DrawerTitle className="text-xl font-bold tracking-tight">Configure Payload</DrawerTitle>
-                        <DrawerClose className="p-2 rounded-full hover:bg-secondary/20 transition-colors">
+                        <DrawerTitle className="text-sm font-black tracking-tighter uppercase text-primary">Configure Payload
+                        </DrawerTitle>
+                        <DrawerClose className="px-2 rounded-full hover:bg-white/10 transition-colors">
                           <X className="size-5" />
                         </DrawerClose>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Adjust parameters for the {mode} agent signal.</p>
                     </DrawerHeader>
 
-                    <div className="flex-1 overflow-hidden px-4 py-2 flex flex-col">
+                    <div className="flex-1 overflow-hidden px-4 py-0 flex flex-col">
                       <EditorPanel
                         mode={mode}
                         value={value}
@@ -552,28 +558,38 @@ export default function WorkspaceClient() {
                       />
                     </div>
 
-                    <div className="p-4 border-t border-border/10 bg-secondary/5">
+                    <div className="px-6 py-1 border-t border-white/5">
                       <button
                         disabled={status === "invalid" || submitting}
-                        onClick={submit}
-                        className={`w-full rounded-xl py-4 font-bold text-sm transition-all flex items-center justify-center gap-3 shadow-xl ${status !== 'invalid' && !submitting ? 'bg-primary text-primary-foreground shadow-primary/30 hover:scale-[1.02] active:scale-[0.98]' : 'bg-secondary text-muted-foreground opacity-50'}`}
+                        onClick={() => {
+                          submit();
+                          setMobileOpen(false);
+                        }}
+                        className={`w-full rounded-2xl py-3 font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-3 shadow-2xl ${status !== 'invalid' && !submitting ? 'bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]' : 'bg-secondary text-muted-foreground opacity-50'}`}
                       >
-                        {submitting ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
-                        {submitting ? "Agent Processing..." : "Submit to Agent"}
+                        {submitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        {submitting ? "Processing..." : "Submit to Agent"}
                       </button>
                     </div>
                   </div>
                 </DrawerContent>
               </Drawer>
-            </div>
 
-            <button
-              onClick={() => setConsoleOpen(true)}
-              className="pointer-events-auto flex-1 max-w-37.5 glass rounded-xl py-3 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border-border/40 hover:bg-secondary/50 transition-all text-muted-foreground shadow-sm"
-            >
-              <Terminal className="size-3" />
-              Console
-            </button>
+              <div className="w-px h-8 bg-white/5 mx-1" />
+
+              <button
+                onClick={() => setConsoleOpen(true)}
+                className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-[1.5rem] hover:bg-white/5 transition-all group text-left border border-transparent active:border-white/10 active:bg-white/5"
+              >
+                <div className="size-9 rounded-full bg-secondary/50 flex items-center justify-center group-active:scale-90 transition-transform border border-white/5">
+                  <Terminal className="size-4 text-muted-foreground" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Console</span>
+                  <span className="text-[9px] text-muted-foreground/40 font-bold">Logs</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </main>
