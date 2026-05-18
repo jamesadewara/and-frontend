@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileJson, Loader2, Send, X, Terminal, Trash2
 } from "lucide-react";
@@ -30,8 +30,15 @@ import { cn } from "@/src/lib/utils";
 
 export default function WorkspaceClient() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("review");
-  const [value, setValue] = useState<string>(JSON.stringify(REVIEW_TEMPLATES["Blank Template"], null, 2));
+  const searchParams = useSearchParams();
+  
+  const queryMode = searchParams.get("mode");
+  const initialMode: Mode = queryMode === "recommendation" || queryMode === "recommend" 
+    ? "recommend" 
+    : "review";
+
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [value, setValue] = useState<string>(JSON.stringify(initialMode === "review" ? REVIEW_TEMPLATES["Blank Template"] : RECOMMEND_TEMPLATES["Blank Template"], null, 2));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
@@ -75,6 +82,16 @@ export default function WorkspaceClient() {
   } = useAgentStream(mode);
 
   const isLive = useHealthCheck();
+
+  // Sync mode with URL search params
+  useEffect(() => {
+    const qMode = searchParams.get("mode");
+    if (qMode === "recommendation" || qMode === "recommend") {
+      setMode("recommend");
+    } else if (qMode === "review") {
+      setMode("review");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -439,6 +456,7 @@ export default function WorkspaceClient() {
                 return;
               }
               setMode(newMode);
+              router.replace(`?mode=${newMode === "recommend" ? "recommendation" : "review"}`, { scroll: false });
             }}
             disabled={submitting}
           />
